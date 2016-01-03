@@ -88,8 +88,11 @@ include_directories(include)
 add_subdirectory(protocols)
 add_subdirectory(common)
 add_subdirectory(wayland)
-
 add_subdirectory(sway)
+
+if(enable-zsh-completions)
+	add_subdirectory(completions/zsh)
+endif()
 if(enable-swaybg)
 	if(CAIRO_FOUND AND PANGO_FOUND)
 		add_subdirectory(swaybg)

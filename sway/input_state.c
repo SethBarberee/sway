@@ -22,12 +22,41 @@ struct key_state {
 
 static struct key_state key_state_array[KEY_STATE_MAX_LENGTH];
 
+static struct key_state last_released;
+
+static uint32_t modifiers_state;
+
 void input_init(void) {
 	int i;
 	for (i = 0; i < KEY_STATE_MAX_LENGTH; ++i) {
 		struct key_state none = { 0, 0, 0 };
 		key_state_array[i] = none;
 	}
+
+	struct key_state none = { 0, 0, 0 };
+	last_released = none;
+
+	modifiers_state = 0;
+}
+
+uint32_t modifier_state_changed(uint32_t new_state, uint32_t mod) {
+	if ((new_state & mod) != 0) { // pressed
+		if ((modifiers_state & mod) != 0) { // already pressed
+			return MOD_STATE_UNCHANGED;
+		} else { // pressed
+			return MOD_STATE_PRESSED;
+		}
+	} else { // not pressed
+		if ((modifiers_state & mod) != 0) { // released
+			return MOD_STATE_RELEASED;
+		} else { // already released
+			return MOD_STATE_UNCHANGED;
+		}
+	}
+}
+
+void modifiers_state_update(uint32_t new_state) {
+	modifiers_state = new_state;
 }
 
 static uint8_t find_key(uint32_t key_sym, uint32_t key_code, bool update) {
@@ -36,8 +65,8 @@ static uint8_t find_key(uint32_t key_sym, uint32_t key_code, bool update) {
 		if (0 == key_sym && 0 == key_code && key_state_array[i].key_sym == 0) {
 			break;
 		}
-		if (key_state_array[i].key_sym == key_sym
-			|| key_state_array[i].alt_sym == key_sym) {
+		if (key_sym != 0 && (key_state_array[i].key_sym == key_sym
+			|| key_state_array[i].alt_sym == key_sym)) {
 			break;
 		}
 		if (update && key_state_array[i].key_code == key_code) {
@@ -50,6 +79,12 @@ static uint8_t find_key(uint32_t key_sym, uint32_t key_code, bool update) {
 
 bool check_key(uint32_t key_sym, uint32_t key_code) {
 	return find_key(key_sym, key_code, false) < KEY_STATE_MAX_LENGTH;
+}
+
+bool check_released_key(uint32_t key_sym) {
+	return (key_sym != 0
+		&& (last_released.key_sym == key_sym
+		|| last_released.alt_sym == key_sym));
 }
 
 void press_key(uint32_t key_sym, uint32_t key_code) {
@@ -70,6 +105,9 @@ void press_key(uint32_t key_sym, uint32_t key_code) {
 void release_key(uint32_t key_sym, uint32_t key_code) {
 	uint8_t index = find_key(key_sym, key_code, true);
 	if (index < KEY_STATE_MAX_LENGTH) {
+		last_released.key_sym = key_state_array[index].key_sym;
+		last_released.alt_sym = key_state_array[index].alt_sym;
+		last_released.key_code = key_state_array[index].key_code;
 		struct key_state none = { 0, 0, 0 };
 		key_state_array[index] = none;
 	}

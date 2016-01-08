@@ -66,7 +66,7 @@ struct status_block {
 list_t *status_line = NULL;
 
 list_t *workspaces = NULL;
-int ipc_socketfd, ipc_listen_socketfd;
+int ipc_socketfd, ipc_event_socketfd;
 pid_t pid;
 int status_read_fd;
 char line[1024];
@@ -76,6 +76,10 @@ struct registry *registry;
 struct window *window;
 bool dirty = true;
 char *separator_symbol = NULL;
+char *mode = NULL;
+bool binding_mode_indicator = true;
+bool strip_workspace_numbers = false;
+bool workspace_buttons = true;
 typedef enum {UNDEF, TEXT, I3BAR} command_protocol;
 command_protocol protocol = UNDEF;
 
@@ -155,8 +159,8 @@ void swaybar_teardown() {
 		close(ipc_socketfd);
 	}
 
-	if (ipc_listen_socketfd) {
-		close(ipc_listen_socketfd);
+	if (ipc_event_socketfd) {
+		close(ipc_event_socketfd);
 	}
 }
 
@@ -289,8 +293,8 @@ void bar_ipc_init(int outputi, const char *bar_id) {
 
 	json_object *bar_config = json_tokener_parse(res);
 	json_object *tray_output, *mode, *hidden_state, *position, *_status_command;
-	json_object *font, *bar_height, *workspace_buttons, *strip_workspace_numbers;
-	json_object *binding_mode_indicator, *verbose, *_colors, *sep_symbol;
+	json_object *font, *bar_height, *_workspace_buttons, *_strip_workspace_numbers;
+	json_object *_binding_mode_indicator, *verbose, *_colors, *sep_symbol;
 	json_object_object_get_ex(bar_config, "tray_output", &tray_output);
 	json_object_object_get_ex(bar_config, "mode", &mode);
 	json_object_object_get_ex(bar_config, "hidden_state", &hidden_state);
@@ -298,9 +302,9 @@ void bar_ipc_init(int outputi, const char *bar_id) {
 	json_object_object_get_ex(bar_config, "status_command", &_status_command);
 	json_object_object_get_ex(bar_config, "font", &font);
 	json_object_object_get_ex(bar_config, "bar_height", &bar_height);
-	json_object_object_get_ex(bar_config, "workspace_buttons", &workspace_buttons);
-	json_object_object_get_ex(bar_config, "strip_workspace_numbers", &strip_workspace_numbers);
-	json_object_object_get_ex(bar_config, "binding_mode_indicator", &binding_mode_indicator);
+	json_object_object_get_ex(bar_config, "workspace_buttons", &_workspace_buttons);
+	json_object_object_get_ex(bar_config, "strip_workspace_numbers", &_strip_workspace_numbers);
+	json_object_object_get_ex(bar_config, "binding_mode_indicator", &_binding_mode_indicator);
 	json_object_object_get_ex(bar_config, "verbose", &verbose);
 	json_object_object_get_ex(bar_config, "separator_symbol", &sep_symbol);
 	json_object_object_get_ex(bar_config, "colors", &_colors);
@@ -321,6 +325,18 @@ void bar_ipc_init(int outputi, const char *bar_id) {
 
 	if (sep_symbol) {
 		separator_symbol = strdup(json_object_get_string(sep_symbol));
+	}
+
+	if (_strip_workspace_numbers) {
+		strip_workspace_numbers = json_object_get_boolean(_strip_workspace_numbers);
+	}
+
+	if (_binding_mode_indicator) {
+		binding_mode_indicator = json_object_get_boolean(_binding_mode_indicator);
+	}
+
+	if (_workspace_buttons) {
+		workspace_buttons = json_object_get_boolean(_workspace_buttons);
 	}
 
 	if (bar_height) {
@@ -403,9 +419,9 @@ void bar_ipc_init(int outputi, const char *bar_id) {
 	json_object_put(bar_config);
 	free(res);
 
-	const char *subscribe_json = "[ \"workspace\" ]";
+	const char *subscribe_json = "[ \"workspace\", \"mode\" ]";
 	len = strlen(subscribe_json);
-	res = ipc_single_command(ipc_listen_socketfd, IPC_SUBSCRIBE, subscribe_json, &len);
+	res = ipc_single_command(ipc_event_socketfd, IPC_SUBSCRIBE, subscribe_json, &len);
 	free(res);
 
 	ipc_update_workspaces();
@@ -567,9 +583,36 @@ void render_block(struct status_block *block, double *x, bool edge) {
 
 }
 
+char *handle_workspace_number(bool strip_num, const char *ws_name) {
+	bool strip = false;
+	int i;
+
+	if (strip_num) {
+		int len = strlen(ws_name);
+		for (i = 0; i < len; ++i) {
+			if (!('0' <= ws_name[i] && ws_name[i] <= '9')) {
+				if (':' == ws_name[i] && i < len-1 && i > 0) {
+					strip = true;
+					++i;
+				}
+				break;
+			}
+		}
+	}
+
+	if (strip) {
+		return strdup(ws_name + i);
+	}
+
+	return strdup(ws_name);
+}
+
 void render_workspace_button(struct workspace *ws, double *x) {
+	// strip workspace numbers if required
+	char *name = handle_workspace_number(strip_workspace_numbers, ws->name);
+
 	int width, height;
-	get_text_size(window, &width, &height, "%s", ws->name);
+	get_text_size(window, &width, &height, "%s", name);
 	struct box_colors box_colors;
 	if (ws->urgent) {
 		box_colors = colors.urgent_workspace;
@@ -596,9 +639,33 @@ void render_workspace_button(struct workspace *ws, double *x) {
 	// text
 	cairo_set_source_u32(window->cairo, box_colors.text);
 	cairo_move_to(window->cairo, (int)*x + ws_hor_padding, margin);
-	pango_printf(window, "%s", ws->name);
+	pango_printf(window, "%s", name);
 
 	*x += width + ws_hor_padding * 2 + ws_spacing;
+
+	free(name);
+}
+
+void render_binding_mode_indicator(double pos) {
+	int width, height;
+	get_text_size(window, &width, &height, "%s", mode);
+
+	// background
+	cairo_set_source_u32(window->cairo, colors.binding_mode.background);
+	cairo_rectangle(window->cairo, pos, 1.5, width + ws_hor_padding * 2 - 1,
+			height + ws_ver_padding * 2);
+	cairo_fill(window->cairo);
+
+	// border
+	cairo_set_source_u32(window->cairo, colors.binding_mode.border);
+	cairo_rectangle(window->cairo, pos, 1.5, width + ws_hor_padding * 2 - 1,
+			height + ws_ver_padding * 2);
+	cairo_stroke(window->cairo);
+
+	// text
+	cairo_set_source_u32(window->cairo, colors.binding_mode.text);
+	cairo_move_to(window->cairo, (int)pos + ws_hor_padding, margin);
+	pango_printf(window, "%s", mode);
 }
 
 void render() {
@@ -634,12 +701,20 @@ void render() {
 		}
 	}
 
-	// Workspaces
 	cairo_set_line_width(window->cairo, 1.0);
 	double x = 0.5;
-	for (i = 0; i < workspaces->length; ++i) {
-		struct workspace *ws = workspaces->items[i];
-		render_workspace_button(ws, &x);
+
+	// Workspaces
+	if (workspace_buttons) {
+		for (i = 0; i < workspaces->length; ++i) {
+			struct workspace *ws = workspaces->items[i];
+			render_workspace_button(ws, &x);
+		}
+	}
+
+	// binding mode indicator
+	if (mode && binding_mode_indicator) {
+		render_binding_mode_indicator(x);
 	}
 }
 
@@ -669,7 +744,7 @@ void free_status_block(void *item) {
 void parse_json(const char *text) {
 	json_object *results = json_tokener_parse(text);
 	if (!results) {
-		sway_log(L_DEBUG, "xxx Failed to parse json");
+		sway_log(L_DEBUG, "Failed to parse json");
 		return;
 	}
 
@@ -1000,6 +1075,45 @@ int i3json_handle_fd(int fd) {
 	return i3json_parse();
 }
 
+bool handle_ipc_event() {
+	struct ipc_response *resp = ipc_recv_response(ipc_event_socketfd);
+	switch (resp->type) {
+	case IPC_EVENT_WORKSPACE:
+		ipc_update_workspaces();
+		break;
+	case IPC_EVENT_MODE: {
+		json_object *result = json_tokener_parse(resp->payload);
+		if (!result) {
+			free_ipc_response(resp);
+			sway_log(L_ERROR, "failed to parse payload as json");
+			return false;
+		}
+		json_object *json_change;
+		if (json_object_object_get_ex(result, "change", &json_change)) {
+			const char *change = json_object_get_string(json_change);
+
+			free(mode);
+			if (strcmp(change, "default") == 0) {
+				mode = NULL;
+			} else {
+				mode = strdup(change);
+			}
+		} else {
+			sway_log(L_ERROR, "failed to parse response");
+		}
+
+		json_object_put(result);
+		break;
+	}
+	default:
+		free_ipc_response(resp);
+		return false;
+	}
+
+	free_ipc_response(resp);
+	return true;
+}
+
 void poll_for_update() {
 	fd_set readfds;
 	int activity;
@@ -1015,7 +1129,7 @@ void poll_for_update() {
 
 		dirty = false;
 		FD_ZERO(&readfds);
-		FD_SET(ipc_listen_socketfd, &readfds);
+		FD_SET(ipc_event_socketfd, &readfds);
 		FD_SET(status_read_fd, &readfds);
 
 		activity = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
@@ -1023,13 +1137,9 @@ void poll_for_update() {
 			sway_log(L_ERROR, "polling failed: %d", errno);
 		}
 
-		if (FD_ISSET(ipc_listen_socketfd, &readfds)) {
-			sway_log(L_DEBUG, "Got workspace update.");
-			uint32_t len;
-			char *buf = ipc_recv_response(ipc_listen_socketfd, &len);
-			free(buf);
-			ipc_update_workspaces();
-			dirty = true;
+		if (FD_ISSET(ipc_event_socketfd, &readfds)) {
+			sway_log(L_DEBUG, "Got IPC event.");
+			dirty = handle_ipc_event();
 		}
 
 		if (status_command && FD_ISSET(status_read_fd, &readfds)) {
@@ -1075,22 +1185,23 @@ void poll_for_update() {
 }
 
 int main(int argc, char **argv) {
-	init_log(L_DEBUG);
 
 	char *socket_path = NULL;
 	char *bar_id = NULL;
+	bool debug = false;
 
 	static struct option long_options[] = {
 		{"version", no_argument, NULL, 'v'},
 		{"socket", required_argument, NULL, 's'},
 		{"bar_id", required_argument, NULL, 'b'},
+		{"debug", required_argument, NULL, 'd'},
 		{0, 0, 0, 0}
 	};
 
 	int c;
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "vs:b:", long_options, &option_index);
+		c = getopt_long(argc, argv, "vs:b:d", long_options, &option_index);
 		if (c == -1) {
 			break;
 		}
@@ -1109,6 +1220,9 @@ int main(int argc, char **argv) {
 #endif
 			exit(EXIT_SUCCESS);
 			break;
+		case 'd': // Debug
+			debug = true;
+			break;
 		default:
 			exit(EXIT_FAILURE);
 		}
@@ -1116,6 +1230,12 @@ int main(int argc, char **argv) {
 
 	if (!bar_id) {
 		sway_abort("No bar_id passed. Provide --bar_id or let sway start swaybar");
+	}
+
+	if (debug) {
+		init_log(L_DEBUG);
+	} else {
+		init_log(L_ERROR);
 	}
 
 	registry = registry_poll();
@@ -1131,7 +1251,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	ipc_socketfd = ipc_open_socket(socket_path);
-	ipc_listen_socketfd = ipc_open_socket(socket_path);
+	ipc_event_socketfd = ipc_open_socket(socket_path);
 
 
 	if (argc == optind) {

@@ -103,6 +103,8 @@ static void free_config(struct sway_config *config) {
 		free_output_config(config->output_configs->items[i]);
 	}
 	list_free(config->output_configs);
+
+	list_free(config->active_bar_modifiers);
 	free(config);
 }
 
@@ -145,6 +147,33 @@ static void config_defaults(struct sway_config *config) {
 	config->edge_gaps = true;
 	config->gaps_inner = 0;
 	config->gaps_outer = 0;
+
+	config->active_bar_modifiers = create_list();
+}
+
+static int compare_modifiers(const void *left, const void *right) {
+	uint32_t a = *(uint32_t *)left;
+	uint32_t b = *(uint32_t *)right;
+
+	return a - b;
+}
+
+void update_active_bar_modifiers() {
+	if (config->active_bar_modifiers->length > 0) {
+		list_free(config->active_bar_modifiers);
+		config->active_bar_modifiers = create_list();
+	}
+
+	struct bar_config *bar;
+	int i;
+	for (i = 0; i < config->bars->length; ++i) {
+		bar = config->bars->items[i];
+		if (strcmp(bar->mode, "hide") == 0 && strcmp(bar->hidden_state, "hide") == 0) {
+			if (list_seq_find(config->active_bar_modifiers, compare_modifiers, &bar->modifier) < 0) {
+				list_add(config->active_bar_modifiers, &bar->modifier);
+			}
+		}
+	}
 }
 
 static char *get_config_path(void) {
@@ -214,6 +243,8 @@ bool load_config(const char *file) {
 		config_load_success = read_config(f, false);
 	}
 	fclose(f);
+
+	update_active_bar_modifiers();
 
 	return config_load_success;
 }
@@ -690,12 +721,30 @@ void free_sway_mouse_binding(struct sway_mouse_binding *binding) {
 	free(binding);
 }
 
+struct sway_binding *sway_binding_dup(struct sway_binding *sb) {
+	struct sway_binding *new_sb = malloc(sizeof(struct sway_binding));
+
+	new_sb->order = sb->order;
+	new_sb->modifiers = sb->modifiers;
+	new_sb->command = strdup(sb->command);
+
+	new_sb->keys = create_list();
+	int i;
+	for (i = 0; i < sb->keys->length; ++i) {
+		xkb_keysym_t *key = malloc(sizeof(xkb_keysym_t));
+		*key = *(xkb_keysym_t *)sb->keys->items[i];
+		list_add(new_sb->keys, key);
+	}
+
+	return new_sb;
+}
+
 struct bar_config *default_bar_config(void) {
 	struct bar_config *bar = NULL;
 	bar = malloc(sizeof(struct bar_config));
 	bar->mode = strdup("dock");
 	bar->hidden_state = strdup("hide");
-	bar->modifier = 0;
+	bar->modifier = WLC_BIT_MOD_LOGO;
 	bar->outputs = NULL;
 	bar->position = DESKTOP_SHELL_PANEL_POSITION_BOTTOM;
 	bar->bindings = create_list();

@@ -22,6 +22,7 @@ struct sway_variable {
  */
 struct sway_binding {
 	int order;
+	bool release;
 	list_t *keys;
 	uint32_t modifiers;
 	char *command;
@@ -135,6 +136,7 @@ struct sway_config {
 	list_t *workspace_outputs;
 	list_t *output_configs;
 	list_t *criteria;
+	list_t *active_bar_modifiers;
 	struct sway_mode *current_mode;
 	struct bar_config *current_bar;
 	uint32_t floating_mod;
@@ -176,12 +178,18 @@ void merge_output_config(struct output_config *dst, struct output_config *src);
 void apply_output_config(struct output_config *oc, swayc_t *output);
 void free_output_config(struct output_config *oc);
 
+/**
+ * Updates the list of active bar modifiers
+ */
+void update_active_bar_modifiers(void);
+
 int workspace_output_cmp_workspace(const void *a, const void *b);
 
 int sway_binding_cmp(const void *a, const void *b);
 int sway_binding_cmp_qsort(const void *a, const void *b);
 int sway_binding_cmp_keys(const void *a, const void *b);
 void free_sway_binding(struct sway_binding *sb);
+struct sway_binding *sway_binding_dup(struct sway_binding *sb);
 
 int sway_mouse_binding_cmp(const void *a, const void *b);
 int sway_mouse_binding_cmp_qsort(const void *a, const void *b);

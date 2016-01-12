@@ -45,7 +45,8 @@ option(enable-swaygrab "Enables the swaygrab utility" YES)
 option(enable-swaymsg "Enables the swaymsg utility" YES)
 option(enable-gdk-pixbuf "Use Pixbuf to support more image formats" YES)
 option(enable-binding-event "Enables binding event subscription" YES)
-option(enable-zsh-completions "Enables terminal completions" YES)
+option(enable-zsh-completions "Enables zsh shell completions" YES)
+option(default-wallpaper "Installs the default wallpaper" YES)
 
 find_package(JsonC REQUIRED)
 find_package(PCRE REQUIRED)
@@ -78,6 +79,9 @@ if (enable-gdk-pixbuf)
 	endif()
 else()
 	message(STATUS "Building without gdk-pixbuf, only png images supported.")
+endif()
+if(enable-binding-event)
+	add_definitions(-DSWAY_BINDING_EVENT=1)
 endif()
 
 include_directories(include)
@@ -117,9 +121,6 @@ if(enable-swaylock)
 		message(WARNING "Not building swaylock - cairo, pango, and PAM are required.")
 	endif()
 endif()
-if(enable-binding-event)
-	add_definitions(-DSWAY_BINDING_EVENT=1)
-endif()
 
 install(
 	FILES ${CMAKE_CURRENT_SOURCE_DIR}/sway.desktop
@@ -127,10 +128,12 @@ install(
 	COMPONENT data
 	)
 
-install(
-	FILES ${CMAKE_CURRENT_SOURCE_DIR}/wallpaper.jpg
-	DESTINATION share/sway
-	COMPONENT data
-	)
+if(default-wallpaper)
+	install(
+		FILES ${CMAKE_CURRENT_SOURCE_DIR}/wallpaper.jpg
+		DESTINATION share/sway
+		COMPONENT data
+		)
+endif()
 
 feature_summary(WHAT ALL)

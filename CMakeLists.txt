@@ -58,6 +58,9 @@ find_package(Pango)
 find_package(GdkPixbuf)
 find_package(PAM)
 
+find_package(LibInput REQUIRED)
+include_directories(${LIBINPUT_INClUDE_DIRS})
+
 find_package(Backtrace)
 if(Backtrace_FOUND)
 	include_directories("${Backtrace_INCLUDE_DIRS}")
@@ -121,7 +124,9 @@ if(enable-swaylock)
 		message(WARNING "Not building swaylock - cairo, pango, and PAM are required.")
 	endif()
 endif()
-
+if(zsh-completions)
+	add_subdirectory(completions/zsh)
+endif()
 install(
 	FILES ${CMAKE_CURRENT_SOURCE_DIR}/sway.desktop
 	DESTINATION share/wayland-sessions

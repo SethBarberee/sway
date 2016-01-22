@@ -4,7 +4,7 @@ include_directories(
 	${PCRE_INCLUDE_DIRS}
 	${JSONC_INCLUDE_DIRS}
 	${XKBCOMMON_INCLUDE_DIRS}
-	${LIBINPUT_LIBRARIES}
+	${LIBINPUT_INCLUDE_DIRS}
 )
 
 add_executable(sway
@@ -24,6 +24,10 @@ add_executable(sway
 	output.c
 	resize.c
 	workspace.c
+)
+
+add_definitions(
+	-DSYSCONFDIR="${CMAKE_INSTALL_FULL_SYSCONFDIR}"
 )
 
 target_link_libraries(sway

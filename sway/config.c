@@ -197,8 +197,8 @@ static char *get_config_path(void) {
 		"$XDG_CONFIG_HOME/sway/config",
 		"$HOME/.i3/config",
 		"$XDG_CONFIG_HOME/i3/config",
-		"${CMAKE_INSTALL_FULL_SYSCONFDIR}/sway/config",
-		"${CMAKE_INSTALL_FULL_SYSCONFDIR}/i3/config",
+		SYSCONFDIR "/sway/config",
+		SYSCONFDIR "/i3/config",
 	};
 
 	if (!getenv("XDG_CONFIG_HOME")) {
@@ -285,6 +285,7 @@ bool read_config(FILE *file, bool is_active) {
 		line_number++;
 		line = strip_whitespace(line);
 		if (line[0] == '#') {
+			free(line);
 			continue;
 		}
 		struct cmd_results *res = config_command(line, block);

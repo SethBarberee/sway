@@ -169,15 +169,18 @@ static struct cmd_results *cmd_assign(int argc, char **argv) {
 
 	char *criteria = *argv++;
 
-	if (strncmp(*argv, "→", 1) == 0) {
+	if (strncmp(*argv, "→", strlen("→")) == 0) {
+		if (argc < 3) {
+			return cmd_results_new(CMD_INVALID, "assign", "Missing workspace");
+		}
 		argv++;
 	}
 
 	char *movecmd = "move container to workspace ";
-	int arglen = strlen(*argv);
-	char *cmdlist = calloc(1, sizeof(movecmd) + arglen);
+	int arglen = strlen(movecmd) + strlen(*argv) + 1;
+	char *cmdlist = calloc(1, arglen);
 
-	sprintf(cmdlist, "%s%s", movecmd, *argv);
+	snprintf(cmdlist, arglen, "%s%s", movecmd, *argv);
 
 	struct criteria *crit = malloc(sizeof(struct criteria));
 	crit->crit_raw = strdup(criteria);
@@ -358,8 +361,10 @@ static struct cmd_results *cmd_exec_always(int argc, char **argv) {
 			return error;
 		}
 
+		add_quotes(argv + 1, argc - 1);
 		tmp = join_args(argv + 1, argc - 1);
 	} else {
+		add_quotes(argv, argc);
 		tmp = join_args(argv, argc);
 	}
 

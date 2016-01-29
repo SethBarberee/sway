@@ -51,6 +51,7 @@ static sway_cmd cmd_floating;
 static sway_cmd cmd_floating_mod;
 static sway_cmd cmd_focus;
 static sway_cmd cmd_focus_follows_mouse;
+static sway_cmd cmd_font;
 static sway_cmd cmd_for_window;
 static sway_cmd cmd_fullscreen;
 static sway_cmd cmd_gaps;
@@ -853,6 +854,27 @@ static struct cmd_results *cmd_move(int argc, char **argv) {
 			focused = swayc_active_workspace();
 		}
 		set_focused_container(focused);
+	} else if (strcasecmp(argv[0], "position") == 0 && strcasecmp(argv[1], "mouse") == 0) {
+		if (view->is_floating) {
+			swayc_t *output = swayc_parent_by_type(view, C_OUTPUT);
+			const struct wlc_geometry *geometry = wlc_view_get_geometry(view->handle);
+			const struct wlc_size *size = wlc_output_get_resolution(output->handle);
+			struct wlc_geometry g = *geometry;
+
+			struct wlc_point origin;
+			wlc_pointer_get_position(&origin);
+
+			int32_t x = origin.x - g.size.w / 2;
+			int32_t y = origin.y - g.size.h / 2;
+			
+			uint32_t w = size->w - g.size.w;
+			uint32_t h = size->h - g.size.h;
+
+			view->x = g.origin.x = MIN(w, MAX(x, 0));
+			view->y = g.origin.y = MIN(h, MAX(y, 0));
+
+			wlc_view_set_geometry(view->handle, 0, &g);
+		}
 	} else {
 		return cmd_results_new(CMD_INVALID, "move", expected_syntax);
 	}
@@ -1822,6 +1844,26 @@ static struct cmd_results *cmd_log_colors(int argc, char **argv) {
 	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
 }
 
+static struct cmd_results *cmd_font(int argc, char **argv) {
+	struct cmd_results *error = NULL;
+	if ((error = checkarg(argc, "font", EXPECTED_AT_LEAST, 1))) {
+		return error;
+	}
+
+	char *font = join_args(argv, argc);
+	if (strlen(font) > 6 && strncmp("pango:", font, 6) == 0) {
+		free(config->font);
+		config->font = font;
+		sway_log(L_DEBUG, "Settings font %s", config->font);
+		return cmd_results_new(CMD_SUCCESS, NULL, NULL);
+	} else {
+		free(font);
+		return cmd_results_new(CMD_FAILURE, "font", "non-pango font detected");
+	}
+
+}
+
+
 static struct cmd_results *cmd_for_window(int argc, char **argv) {
 	struct cmd_results *error = NULL;
 	if ((error = checkarg(argc, "for_window", EXPECTED_AT_LEAST, 2))) {
@@ -1978,6 +2020,7 @@ static struct cmd_handler handlers[] = {
 	{ "floating_modifier", cmd_floating_mod },
 	{ "focus", cmd_focus },
 	{ "focus_follows_mouse", cmd_focus_follows_mouse },
+	{ "font", cmd_font },
 	{ "for_window", cmd_for_window },
 	{ "fullscreen", cmd_fullscreen },
 	{ "gaps", cmd_gaps },

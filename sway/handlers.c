@@ -4,6 +4,7 @@
 #include <libinput.h>
 #include <math.h>
 #include <wlc/wlc.h>
+#include <wlc/wlc-render.h>
 #include <wlc/wlc-wayland.h>
 #include <ctype.h>
 
@@ -147,6 +148,10 @@ static void handle_output_pre_render(wlc_handle output) {
 			break;
 		}
 	}
+}
+
+static void handle_output_post_render(wlc_handle output) {
+	ipc_get_pixels(output);
 }
 
 static void handle_output_resolution_change(wlc_handle output, const struct wlc_size *from, const struct wlc_size *to) {
@@ -674,7 +679,8 @@ struct wlc_interface interface = {
 		.resolution = handle_output_resolution_change,
 		.focus = handle_output_focused,
 		.render = {
-			.pre = handle_output_pre_render
+			.pre = handle_output_pre_render,
+			.post = handle_output_post_render
 		}
 	},
 	.view = {

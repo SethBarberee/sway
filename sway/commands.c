@@ -450,7 +450,7 @@ static struct cmd_results *cmd_exit(int argc, char **argv) {
 	}
 	// Close all views
 	close_views(&root_container);
-	sway_terminate();
+	sway_terminate(EXIT_SUCCESS);
 	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
 }
 
@@ -672,8 +672,9 @@ static void hide_view_in_scratchpad(swayc_t *sp_view) {
 	remove_child(sp_view);
 	if (swayc_active_workspace() != ws && ws->floating->length == 0 && ws->children->length == 0) {
 		destroy_workspace(ws);
+	} else {
+		arrange_windows(ws, -1, -1);
 	}
-	arrange_windows(ws, -1, -1);
 	set_focused_container(container_under_pointer());
 }
 

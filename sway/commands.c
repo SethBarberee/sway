@@ -75,6 +75,7 @@ static sway_cmd cmd_splitv;
 static sway_cmd cmd_sticky;
 static sway_cmd cmd_workspace;
 static sway_cmd cmd_ws_auto_back_and_forth;
+static sway_cmd cmd_workspace_layout;
 
 static sway_cmd bar_cmd_binding_mode_indicator;
 static sway_cmd bar_cmd_bindsym;
@@ -316,7 +317,7 @@ static struct cmd_results *cmd_bindcode(int argc, char **argv) {
 		}
 		// parse keycode
 		int keycode = (int)strtol(split->items[i], NULL, 10);
-		if (!xkb_keycode_is_legal_x11(keycode)) {
+		if (!xkb_keycode_is_legal_ext(keycode)) {
 			error = cmd_results_new(CMD_INVALID, "bindcode", "Invalid keycode '%s'", (char *)split->items[i]);
 			free_sway_binding(binding);
 			list_free(split);
@@ -362,10 +363,8 @@ static struct cmd_results *cmd_exec_always(int argc, char **argv) {
 			return error;
 		}
 
-		add_quotes(argv + 1, argc - 1);
 		tmp = join_args(argv + 1, argc - 1);
 	} else {
-		add_quotes(argv, argc);
 		tmp = join_args(argv, argc);
 	}
 
@@ -1984,6 +1983,24 @@ static struct cmd_results *cmd_workspace(int argc, char **argv) {
 	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
 }
 
+static struct cmd_results *cmd_workspace_layout(int argc, char **argv) {
+	struct cmd_results *error = NULL;
+	if ((error = checkarg(argc, "workspace_layout", EXPECTED_EQUAL_TO, 1))) {
+		return error;
+	}
+
+	if (strcasecmp(argv[0], "default") == 0) {
+		config->default_layout = L_NONE;
+	} else if (strcasecmp(argv[0], "stacking") == 0) {
+		config->default_layout = L_STACKED;
+	} else if (strcasecmp(argv[0], "tabbed") == 0) {
+		config->default_layout = L_TABBED;
+	} else {
+		return cmd_results_new(CMD_INVALID, "workspace_layout", "Expected 'workspace_layout <default|stacking|tabbed>'");
+	}
+	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
+}
+
 static struct cmd_results *cmd_ws_auto_back_and_forth(int argc, char **argv) {
 	struct cmd_results *error = NULL;
 	if ((error = checkarg(argc, "workspace_auto_back_and_forth", EXPECTED_EQUAL_TO, 1))) {
@@ -2038,6 +2055,7 @@ static struct cmd_handler handlers[] = {
 	{ "sticky", cmd_sticky },
 	{ "workspace", cmd_workspace },
 	{ "workspace_auto_back_and_forth", cmd_ws_auto_back_and_forth },
+	{ "workspace_layout", cmd_workspace_layout },
 };
 
 static struct cmd_results *bar_cmd_binding_mode_indicator(int argc, char **argv) {
@@ -2869,10 +2887,12 @@ struct cmd_results *handle_command(char *_exec) {
 			//TODO better handling of argv
 			int argc;
 			char **argv = split_args(cmd, &argc);
-			int i;
-			for (i = 1; i < argc; ++i) {
-				if (*argv[i] == '\"' || *argv[i] == '\'') {
-					strip_quotes(argv[i]);
+			if (strcmp(argv[0], "exec") != 0) {
+				int i;
+				for (i = 1; i < argc; ++i) {
+					if (*argv[i] == '\"' || *argv[i] == '\'') {
+						strip_quotes(argv[i]);
+					}
 				}
 			}
 			struct cmd_handler *handler = find_handler(argv[0], CMD_BLOCK_END);

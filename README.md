@@ -8,10 +8,10 @@ irc.freenode.net).
 
 ![](https://sr.ht/NCx_.png)
 
-## Rationale
+## Release Signatures
 
-I use i3 on xorg. Wayland is coming, and [i3way](http://i3way.org/) still has
-zero lines of source code after two years.
+Releases are signed with [B22DA89A](http://pgp.mit.edu/pks/lookup?op=vindex&search=0x52CB6609B22DA89A)
+and published [on GitHub](https://github.com/SirCmpwn/sway/releases).
 
 ## Status
 
@@ -24,15 +24,14 @@ zero lines of source code after two years.
 
 ### From Packages
 
-sway is not supported by many distributions yet. Here's a list of packages
+Sway is not supported by many distributions yet. Here's a list of packages
 available for you to install:
 
 * [Arch Linux](https://aur.archlinux.org/packages/sway-git/)
-* [Gentoo Linux](https://github.com/zetok/zetok-overlay/)
-* [openSUSE](https://build.opensuse.org/project/show/X11:Wayland)
-* [Void Linux](https://wiki.voidlinux.eu/sway)
 
 For other distros, [see this wiki page](https://github.com/SirCmpwn/sway/wiki/Install-on-other-distros).
+If you're interested in packaging Sway for your distribution, stop by the IRC
+channel or shoot an email to sir@cmpwn.com for advice.
 
 ### Compiling from Source
 

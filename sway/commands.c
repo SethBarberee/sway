@@ -55,6 +55,7 @@ static sway_cmd cmd_font;
 static sway_cmd cmd_for_window;
 static sway_cmd cmd_fullscreen;
 static sway_cmd cmd_gaps;
+static sway_cmd cmd_include;
 static sway_cmd cmd_input;
 static sway_cmd cmd_kill;
 static sway_cmd cmd_layout;
@@ -214,10 +215,7 @@ static struct cmd_results *cmd_bindsym(int argc, char **argv) {
 	struct cmd_results *error = NULL;
 	if ((error = checkarg(argc, "bindsym", EXPECTED_MORE_THAN, 1))) {
 		return error;
-	} else if (!config->reading) {
-		return cmd_results_new(CMD_FAILURE, "bindsym", "Can only be used in config file.");
 	}
-
 
 	struct sway_binding *binding = malloc(sizeof(struct sway_binding));
 	binding->keys = create_list();
@@ -282,10 +280,7 @@ static struct cmd_results *cmd_bindcode(int argc, char **argv) {
 	struct cmd_results *error = NULL;
 	if ((error = checkarg(argc, "bindcode", EXPECTED_MORE_THAN, 1))) {
 		return error;
-	} else if (!config->reading) {
-		return cmd_results_new(CMD_FAILURE, "bindcode", "Can only be used in config file.");
 	}
-
 
 	struct sway_binding *binding = malloc(sizeof(struct sway_binding));
 	binding->keys = create_list();
@@ -1141,6 +1136,19 @@ static struct cmd_results *input_cmd_tap(int argc, char **argv) {
 	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
 }
 
+static struct cmd_results *cmd_include(int argc, char **argv) {
+	struct cmd_results *error = NULL;
+	if ((error = checkarg(argc, "include", EXPECTED_EQUAL_TO, 1))) {
+		return error;
+	}
+
+	if (!load_include_configs(argv[0], config)) {
+		return cmd_results_new(CMD_INVALID, "include", "Failed to include sub configuration file: %s", argv[0]);
+	}
+
+	return cmd_results_new(CMD_SUCCESS, NULL, NULL);
+}
+
 static struct cmd_results *cmd_input(int argc, char **argv) {
 	struct cmd_results *error = NULL;
 	if ((error = checkarg(argc, "input", EXPECTED_AT_LEAST, 2))) {
@@ -1541,7 +1549,9 @@ static struct cmd_results *cmd_reload(int argc, char **argv) {
 	if ((error = checkarg(argc, "reload", EXPECTED_EQUAL_TO, 0))) {
 		return error;
 	}
-	if (!load_config(NULL)) return cmd_results_new(CMD_FAILURE, "reload", "Error(s) reloading config.");
+	if (!load_main_config(config->current_config, true)) {
+		return cmd_results_new(CMD_FAILURE, "reload", "Error(s) reloading config.");
+	}
 
 	load_swaybars();
 
@@ -2053,6 +2063,7 @@ static struct cmd_handler handlers[] = {
 	{ "for_window", cmd_for_window },
 	{ "fullscreen", cmd_fullscreen },
 	{ "gaps", cmd_gaps },
+	{ "include", cmd_include },
 	{ "input", cmd_input },
 	{ "kill", cmd_kill },
 	{ "layout", cmd_layout },
